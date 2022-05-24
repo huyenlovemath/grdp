@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/tomatome/grdp/plugin/cliprdr"
@@ -57,6 +58,11 @@ func BitmapDecompress(bitmap *pdu.BitmapData) []byte {
 	return core.Decompress(bitmap.BitmapDataStream, int(bitmap.Width), int(bitmap.Height), Bpp(bitmap.BitsPerPixel))
 }
 
+var (
+	mu sync.Mutex
+	bs []Bitmap
+)
+
 func uiRdp(info *Info) (error, *RdpClient) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
@@ -82,23 +88,44 @@ func uiRdp(info *Info) (error, *RdpClient) {
 		glog.Info("on ready")
 
 	}).On("update", func(rectangles []pdu.BitmapData) {
-		glog.Info("on update Bitmap:", len(rectangles))
-		bs := make([]Bitmap, 0, 50)
-		for _, v := range rectangles {
-			IsCompress := v.IsCompress()
-			data := v.BitmapDataStream
-			//glog.Info("data:", data)
-			if IsCompress {
-				data = BitmapDecompress(&v)
-				IsCompress = false
-			}
 
-			//glog.Info(IsCompress, v.BitsPerPixel)
-			b := Bitmap{int(v.DestLeft), int(v.DestTop), int(v.DestRight), int(v.DestBottom),
-				int(v.Width), int(v.Height), Bpp(v.BitsPerPixel), IsCompress, data}
-			//glog.Infof("b:%+v, %d==%d", b.DestLeft, len(b.Data), b.Width*b.Height*4)
-			bs = append(bs, b)
+		glog.Info("on update Bitmap:", len(rectangles))
+		bs = make([]Bitmap, 0, 50)
+		var wg sync.WaitGroup
+		wg.Add(len(rectangles))
+		fmt.Println("Running for loop...")
+		for _, v := range rectangles {
+
+			// Spawn a thread for each iteration in the loop.
+			// Pass 'i' into the goroutine's function
+			//   in order to make sure each goroutine
+			//   uses a different value for 'i'.
+			go func(v pdu.BitmapData) {
+
+				IsCompress := v.IsCompress()
+				data := v.BitmapDataStream
+				//glog.Info("data:", data)
+				if IsCompress {
+					data = BitmapDecompress(&v)
+					IsCompress = false
+				}
+
+				//glog.Info(IsCompress, v.BitsPerPixel)
+				b := Bitmap{int(v.DestLeft), int(v.DestTop), int(v.DestRight), int(v.DestBottom),
+					int(v.Width), int(v.Height), Bpp(v.BitsPerPixel), IsCompress, data}
+				//glog.Infof("b:%+v, %d==%d", b.DestLeft, len(b.Data), b.Width*b.Height*4)
+				mu.Lock()
+
+				bs = append(bs, b)
+
+				defer mu.Unlock()
+				// At the end of the goroutine, tell the WaitGroup
+				//   that another thread has completed.
+				defer wg.Done()
+			}(v)
+
 		}
+		wg.Wait()
 		ui_paint_bitmap(bs)
 	})
 

@@ -11,7 +11,7 @@ import (
 	"github.com/tomatome/grdp/glog"
 
 	"github.com/tomatome/grdp/core"
-
+	//"github.com/lxn/win"
 	"github.com/tomatome/win"
 )
 
@@ -74,8 +74,14 @@ func (c *Control) withOpenClipboard(f func()) {
 	}
 }
 func ClipWatcher(c *CliprdrClient) {
-	win.OleInitialize(0)
-	defer win.OleUninitialize()
+
+	ole32handle := syscall.MustLoadDLL("Ole32.dll")
+	funcOleInitialize := ole32handle.MustFindProc("OleInitialize")
+	funcOleUninitialize := ole32handle.MustFindProc("OleUninitialize")
+
+	funcOleInitialize.Call(0)
+
+	defer funcOleUninitialize.Call()
 	className := syscall.StringToUTF16Ptr("ClipboardHiddenMessageProcessor")
 	windowName := syscall.StringToUTF16Ptr("rdpclip")
 	wndClassEx := w32.WNDCLASSEX{

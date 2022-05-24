@@ -23,7 +23,8 @@ func init() {
 }
 
 func main() {
-	flag.BoolVar(&server, "s", false, "web server")
+	//flag.BoolVar(&server, "s", false, "web server")
+	flag.BoolVar(&server, "s", true, "web server")
 	flag.Parse()
 
 	runtime.GOMAXPROCS(runtime.NumCPU())

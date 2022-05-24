@@ -332,6 +332,9 @@ func (c *CliprdrClient) Send(s []byte) (int, error) {
 func (c *CliprdrClient) Sender(f core.ChannelSender) {
 	c.w = f
 }
+func (c *CliprdrClient) SetSender(f core.ChannelSender) {
+	c.w = f
+}
 func (c *CliprdrClient) GetType() (string, uint32) {
 	return plugin.CLIPRDR_SVC_CHANNEL_NAME, plugin.CHANNEL_OPTION_INITIALIZED | plugin.CHANNEL_OPTION_ENCRYPT_RDP |
 		plugin.CHANNEL_OPTION_COMPRESS_RDP | plugin.CHANNEL_OPTION_SHOW_PROTOCOL
