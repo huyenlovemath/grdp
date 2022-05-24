@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"text/template"
 	"time"
 
 	socketio "github.com/googollee/go-socket.io"
-	"github.com/tomatome/grdp/glog"
-	"github.com/tomatome/grdp/protocol/pdu"
+	"github.com/huyenlovemath/grdp/glog"
+	"github.com/huyenlovemath/grdp/protocol/pdu"
 )
 
 func showPreview(w http.ResponseWriter, r *http.Request) {
@@ -25,6 +26,11 @@ func showPreview(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, nil)
 
 }
+
+var (
+	mu   sync.Mutex
+	g_bs []Bitmap
+)
 
 func socketIO() {
 	server := socketio.NewServer(nil)
@@ -62,23 +68,33 @@ func socketIO() {
 			fmt.Println("on ready")
 		}).On("update", func(rectangles []pdu.BitmapData) {
 			glog.Info(time.Now(), "on update Bitmap:", len(rectangles))
-			bs := make([]Bitmap, 0, len(rectangles))
-			for _, v := range rectangles {
-				IsCompress := v.IsCompress()
-				data := v.BitmapDataStream
-				glog.Debug("data:", data)
-				if IsCompress {
-					//data = decompress(&v)
-					//IsCompress = false
-				}
+			g_bs = make([]Bitmap, 0, len(rectangles))
+			var wg sync.WaitGroup
+			wg.Add(len(rectangles))
+			for i, v := range rectangles {
+				go func(v pdu.BitmapData, so *socketio.Conn, i int) {
+					fmt.Println(i)
+					IsCompress := v.IsCompress()
+					data := v.BitmapDataStream
+					glog.Debug("data:", data)
+					if IsCompress {
+						// data = BitmapDecompress(&v)
+						// IsCompress = false
+					}
 
-				glog.Debug(IsCompress, v.BitsPerPixel)
-				b := Bitmap{int(v.DestLeft), int(v.DestTop), int(v.DestRight), int(v.DestBottom),
-					int(v.Width), int(v.Height), int(v.BitsPerPixel), IsCompress, data}
-				so.Emit("rdp-bitmap", []Bitmap{b})
-				bs = append(bs, b)
+					glog.Debug(IsCompress, v.BitsPerPixel)
+					b := Bitmap{int(v.DestLeft), int(v.DestTop), int(v.DestRight), int(v.DestBottom),
+						int(v.Width), int(v.Height), int(v.BitsPerPixel), IsCompress, data}
+					(*so).Emit("rdp-bitmap", []Bitmap{b})
+
+					g_bs = append(g_bs, b)
+					//(*so).Emit("rdp-bitmap", g_bs)
+
+					defer wg.Done()
+				}(v, &so, i)
 			}
-			so.Emit("rdp-bitmap", bs)
+			wg.Wait()
+			//so.Emit("rdp-bitmap", g_bs)
 		})
 	})
 
@@ -177,6 +193,6 @@ func socketIO() {
 	http.Handle("/img/", http.FileServer(http.Dir("static")))
 	http.HandleFunc("/", showPreview)
 
-	log.Println("Serving at localhost:8088...")
-	log.Fatal(http.ListenAndServe(":8088", nil))
+	log.Println("Serving at 192.168.187.131:8700...")
+	log.Fatal(http.ListenAndServe("192.168.187.131:8700", nil))
 }

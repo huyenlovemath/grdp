@@ -9,9 +9,9 @@ import (
 
 	"github.com/lunixbochs/struc"
 
-	"github.com/tomatome/grdp/core"
-	"github.com/tomatome/grdp/glog"
-	"github.com/tomatome/grdp/plugin"
+	"github.com/huyenlovemath/grdp/core"
+	"github.com/huyenlovemath/grdp/glog"
+	"github.com/huyenlovemath/grdp/plugin"
 )
 
 /**

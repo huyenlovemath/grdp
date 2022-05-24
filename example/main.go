@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/tomatome/grdp/glog"
+	"github.com/huyenlovemath/grdp/glog"
 )
 
 var (
@@ -24,6 +24,7 @@ func init() {
 
 func main() {
 	//flag.BoolVar(&server, "s", false, "web server")
+	fmt.Println("Hello")
 	flag.BoolVar(&server, "s", true, "web server")
 	flag.Parse()
 

@@ -6,21 +6,20 @@ import (
 	"fmt"
 	"net"
 	"runtime"
-	"sync"
 	"time"
 
-	"github.com/tomatome/grdp/plugin/cliprdr"
+	"github.com/huyenlovemath/grdp/plugin/cliprdr"
 
-	"github.com/tomatome/grdp/plugin"
+	"github.com/huyenlovemath/grdp/plugin"
 
-	"github.com/tomatome/grdp/core"
-	"github.com/tomatome/grdp/glog"
-	"github.com/tomatome/grdp/protocol/nla"
-	"github.com/tomatome/grdp/protocol/pdu"
-	"github.com/tomatome/grdp/protocol/sec"
-	"github.com/tomatome/grdp/protocol/t125"
-	"github.com/tomatome/grdp/protocol/tpkt"
-	"github.com/tomatome/grdp/protocol/x224"
+	"github.com/huyenlovemath/grdp/core"
+	"github.com/huyenlovemath/grdp/glog"
+	"github.com/huyenlovemath/grdp/protocol/nla"
+	"github.com/huyenlovemath/grdp/protocol/pdu"
+	"github.com/huyenlovemath/grdp/protocol/sec"
+	"github.com/huyenlovemath/grdp/protocol/t125"
+	"github.com/huyenlovemath/grdp/protocol/tpkt"
+	"github.com/huyenlovemath/grdp/protocol/x224"
 )
 
 const (
@@ -58,11 +57,6 @@ func BitmapDecompress(bitmap *pdu.BitmapData) []byte {
 	return core.Decompress(bitmap.BitmapDataStream, int(bitmap.Width), int(bitmap.Height), Bpp(bitmap.BitsPerPixel))
 }
 
-var (
-	mu sync.Mutex
-	bs []Bitmap
-)
-
 func uiRdp(info *Info) (error, *RdpClient) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
@@ -90,9 +84,8 @@ func uiRdp(info *Info) (error, *RdpClient) {
 	}).On("update", func(rectangles []pdu.BitmapData) {
 
 		glog.Info("on update Bitmap:", len(rectangles))
-		bs = make([]Bitmap, 0, 50)
-		var wg sync.WaitGroup
-		wg.Add(len(rectangles))
+		bs := make([]Bitmap, 0, 50)
+
 		fmt.Println("Running for loop...")
 		for _, v := range rectangles {
 
@@ -100,32 +93,24 @@ func uiRdp(info *Info) (error, *RdpClient) {
 			// Pass 'i' into the goroutine's function
 			//   in order to make sure each goroutine
 			//   uses a different value for 'i'.
-			go func(v pdu.BitmapData) {
 
-				IsCompress := v.IsCompress()
-				data := v.BitmapDataStream
-				//glog.Info("data:", data)
-				if IsCompress {
-					data = BitmapDecompress(&v)
-					IsCompress = false
-				}
+			IsCompress := v.IsCompress()
+			data := v.BitmapDataStream
+			//glog.Info("data:", data)
+			if IsCompress {
+				data = BitmapDecompress(&v)
+				IsCompress = false
+			}
 
-				//glog.Info(IsCompress, v.BitsPerPixel)
-				b := Bitmap{int(v.DestLeft), int(v.DestTop), int(v.DestRight), int(v.DestBottom),
-					int(v.Width), int(v.Height), Bpp(v.BitsPerPixel), IsCompress, data}
-				//glog.Infof("b:%+v, %d==%d", b.DestLeft, len(b.Data), b.Width*b.Height*4)
-				mu.Lock()
+			//glog.Info(IsCompress, v.BitsPerPixel)
+			b := Bitmap{int(v.DestLeft), int(v.DestTop), int(v.DestRight), int(v.DestBottom),
+				int(v.Width), int(v.Height), Bpp(v.BitsPerPixel), IsCompress, data}
+			//glog.Infof("b:%+v, %d==%d", b.DestLeft, len(b.Data), b.Width*b.Height*4)
 
-				bs = append(bs, b)
-
-				defer mu.Unlock()
-				// At the end of the goroutine, tell the WaitGroup
-				//   that another thread has completed.
-				defer wg.Done()
-			}(v)
+			bs = append(bs, b)
 
 		}
-		wg.Wait()
+
 		ui_paint_bitmap(bs)
 	})
 
